@@ -1,7 +1,7 @@
 "use client";
 
-import styles from "./switch.module.css";
 import { memo, useEffect, useState } from "react";
+import styles from "./switch.module.css";
 
 declare global {
   var updateDOM: () => void;
@@ -57,32 +57,45 @@ let updateDOM: () => void;
  * Switch button to quickly toggle user preference.
  */
 const Switch = () => {
-  const [mode, setMode] = useState<ColorSchemePreference>(
-    () =>
-      ((typeof localStorage !== "undefined" &&
-        localStorage.getItem(STORAGE_KEY)) ??
-        "system") as ColorSchemePreference,
-  );
+  const [mode, setMode] = useState<ColorSchemePreference>("system");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // store global functions to local variables to avoid any interference
+    // This code runs only on the client
+    const storedMode = localStorage.getItem(STORAGE_KEY) as ColorSchemePreference | null;
+    const initialMode = storedMode ?? "system";
+
+    setMode(initialMode);
+    setMounted(true);
+
     updateDOM = window.updateDOM;
-    /** Sync the tabs */
-    addEventListener("storage", (e: StorageEvent): void => {
-      e.key === STORAGE_KEY && setMode(e.newValue as ColorSchemePreference);
-    });
+
+    // Listen for changes in other tabs
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        setMode(e.newValue as ColorSchemePreference);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     localStorage.setItem(STORAGE_KEY, mode);
-    updateDOM();
-  }, [mode]);
+    updateDOM?.();
+  }, [mode, mounted]);
 
-  /** toggle mode */
   const handleModeSwitch = () => {
     const index = modes.indexOf(mode);
     setMode(modes[(index + 1) % modes.length]);
   };
+
+  if (!mounted) return null;
+
   return (
     <button
       suppressHydrationWarning
@@ -91,6 +104,7 @@ const Switch = () => {
     />
   );
 };
+
 
 const Script = memo(() => (
   <script
@@ -103,11 +117,21 @@ const Script = memo(() => (
 /**
  * This component wich applies classes and transitions.
  */
+
+
+// keep your NoFOUCScript and STORAGE_KEY etc.
+
 export const ThemeSwitcher = () => {
   return (
     <>
-      <Script />
+      <script
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: `(${NoFOUCScript.toString()})('${STORAGE_KEY}')`,
+        }}
+      />
       <Switch />
     </>
   );
 };
+

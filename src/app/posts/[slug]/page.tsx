@@ -9,11 +9,19 @@ import Header from "@/app/_components/header";
 import { PostBody } from "@/app/_components/post-body";
 import { PostHeader } from "@/app/_components/post-header";
 
+// ✅ Import your draft slugs
+import { DRAFT_POST_SLUGS } from "@/config";
+
 export default async function Post(props: Params) {
   const params = await props.params;
   const post = getPostBySlug(params.slug);
 
-  if (!post) {
+  // ✅ Hide post in production if it's in the draft list
+  if (
+    !post ||
+    (process.env.NODE_ENV === "production" &&
+      DRAFT_POST_SLUGS.includes(params.slug))
+  ) {
     return notFound();
   }
 
@@ -48,7 +56,12 @@ export async function generateMetadata(props: Params): Promise<Metadata> {
   const params = await props.params;
   const post = getPostBySlug(params.slug);
 
-  if (!post) {
+  // ✅ Same protection in metadata function
+  if (
+    !post ||
+    (process.env.NODE_ENV === "production" &&
+      DRAFT_POST_SLUGS.includes(params.slug))
+  ) {
     return notFound();
   }
 
@@ -66,7 +79,14 @@ export async function generateMetadata(props: Params): Promise<Metadata> {
 export async function generateStaticParams() {
   const posts = getAllPosts();
 
-  return posts.map((post) => ({
-    slug: post.slug,
-  }));
+  // ✅ Filter out draft posts in production so they don’t even build
+  return posts
+    .filter(
+      (post) =>
+        process.env.NODE_ENV !== "production" ||
+        !DRAFT_POST_SLUGS.includes(post.slug)
+    )
+    .map((post) => ({
+      slug: post.slug,
+    }));
 }
